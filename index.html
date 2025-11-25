@@ -50,47 +50,56 @@
         let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
         let timeoutId = null;
         const overlay = document.getElementById("black-overlay");
-        const proxy = "https://corsproxy.io/?";
+        const proxy = "https://corsproxy.io/?";   // oder https://api.allorigins.win/raw?url=
 
         async function sucheVideo(artist) {
-            const queries = ["official music video", "offizielles video", "music video", "vevo", "topic"];
-            for (let term of queries) {
-                try {
-                    const q = `${artist} ${term}`;
-                    const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(q));
-                    const resp = await fetch(url);
-                    const html = await resp.text();
-                    const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
-                    if (ids.length < 10) continue;  // mindestens 10 Ergebnisse
+            // 5 verschiedene Suchbegriffe + zufällige Seite (sp= Parameter)
+            const searches = [
+                `${artist} official music video`,
+                `${artist} offizielles video`,
+                `${artist} music video -live -reaction`,
+                `${artist} topic`,
+                `${artist}`
+            ];
+            const randomSearch = searches[Math.floor(Math.random() * searches.length)];
+            const randomPage = Math.floor(Math.random() * 8); // 0–7 → bis Seite 8
+            const sp = btoa(`CAIQAA${randomPage === 0 ? "" : "==" + "A".repeat(randomPage)}`); // YouTube Pagination Hack
 
-                    // Zufälliges aus den ersten 50 (mehr Vielfalt)
-                    videoId = ids[Math.floor(Math.random() * Math.min(50, ids.length))];
-                    const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"text":"([^"]+)"`));
-                    let raw = titleMatch ? titleMatch[1] : "Song";
-                    currentTitle = raw.split(/[-|–—:]/).pop().replace(/\s*\(.*?\)|\s*\[.*?\]|official.{0,30}video|music video|lyrics|vevo|topic|feat.*|ft.*/gi,"").trim();
-                    if (currentTitle.length > 3) return;
-                } catch(e) {}
-            }
-            throw "Kein Video";
+            const url = proxy + encodeURIComponent(`https://www.youtube.com/results?search_query=${encodeURIComponent(randomSearch)}&sp=${sp}`);
+            const resp = await fetch(url);
+            const html = await resp.text();
+
+            const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
+            if (ids.length < 5) throw "Zu wenig Ergebnisse";
+
+            // Zufällig aus den ersten 100 nehmen
+            videoId = ids[Math.floor(Math.random() * Math.min(100, ids.length))];
+
+            // Besserer Titel-Parser
+            const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
+            let raw = titleMatch ? titleMatch[1] : "Song";
+            currentTitle = raw
+                .replace(new RegExp(`^${artist}\\s*[-–—:–]\\s*`, 'i'), '')
+                .replace(/\\s*\\(Official.*|offizielles.*|Music Video.*|Lyrics.*|Audio.*|\\[.*\\]/gi, '')
+                .trim();
+
+            if (currentTitle.length < 3) currentTitle = "Unbekannter Song";
         }
 
         function playSnippet(showVideo = false) {
             if (timeoutId) clearTimeout(timeoutId);
-
             overlay.style.display = showVideo ? 'none' : 'block';
 
             player.loadVideoById({
                 videoId: videoId,
                 startSeconds: startSec,
-                playerVars: { controls:0, showinfo:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, autoplay:1 }
+                playerVars: { controls:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, autoplay:1 }
             });
             player.playVideo();
 
-            // Immer nur die kurze Zeit – egal ob mit oder ohne Video
             timeoutId = setTimeout(() => {
                 player.pauseVideo();
                 overlay.style.display = 'block';
-                timeoutId = null;
             }, snippetLen * 1000);
         }
 
@@ -101,7 +110,7 @@
 
             try {
                 await sucheVideo(currentArtist);
-                startSec = Math.floor(Math.random() * 140) + 15;
+                startSec = Math.floor(Math.random() * 180) + 20;  // 20 Sek bis 3:20 → echte Vielfalt
                 playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
@@ -122,7 +131,7 @@
             if (currentTitle.toLowerCase().includes(guess)) {
                 if (timeoutId) clearTimeout(timeoutId);
                 overlay.style.display = 'none';
-                player.playVideo();  // komplett durch
+                player.playVideo();
                 document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
                 document.getElementById("nextButton").classList.remove("hide");
                 document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
@@ -140,7 +149,7 @@
         document.getElementById("giveUp").onclick = () => {
             if (timeoutId) clearTimeout(timeoutId);
             overlay.style.display = 'none';
-            player.playVideo();  // komplett durch
+            player.playVideo();
             document.getElementById("feedback").innerHTML = `Aufgegeben! Es war:<br><b>${currentTitle}</b>`;
             document.getElementById("nextButton").classList.remove("hide");
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
