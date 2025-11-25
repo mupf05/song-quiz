@@ -73,10 +73,10 @@
             throw "Kein Video";
         }
 
-        function playSnippet(showVideo = false) {
+        function playSnippet(onlyAudio = false) {
             if (timeoutId) clearTimeout(timeoutId);
 
-            overlay.style.display = showVideo ? 'none' : 'block';
+            overlay.style.display = onlyAudio ? 'block' : 'none';
 
             player.loadVideoById({
                 videoId: videoId,
@@ -85,8 +85,8 @@
             });
             player.playVideo();
 
-            // NUR wenn "nur Ton" → Timer setzen
-            if (!showVideo) {
+            // NUR bei "nur Ton" → Timer setzen
+            if (onlyAudio) {
                 timeoutId = setTimeout(() => {
                     player.pauseVideo();
                     overlay.style.display = 'block';
@@ -103,7 +103,7 @@
             try {
                 await sucheVideo(currentArtist);
                 startSec = Math.floor(Math.random() * 140) + 15;
-                playSnippet(false);
+                playSnippet(true);  // erste Runde immer nur Ton
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
                 document.getElementById("feedback").textContent = "Kein Video – nochmal Los geht’s!";
@@ -136,8 +136,12 @@
             }
         };
 
-        document.getElementById("repeatAudio").onclick = () => playSnippet(false);
-        document.getElementById("repeatVideo").onclick = () => playSnippet(true);  // ← läuft jetzt komplett durch!
+        // NUR TON → kurz
+        document.getElementById("repeatAudio").onclick = () => playSnippet(true);
+
+        // MIT VIDEO → komplett durch
+        document.getElementById("repeatVideo").onclick = () => playSnippet(false);
+
         document.getElementById("giveUp").onclick = () => {
             if (timeoutId) clearTimeout(timeoutId);
             overlay.style.display = 'none';
@@ -147,6 +151,7 @@
             document.getElementById("nextButton").classList.remove("hide");
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
         };
+
         document.getElementById("nextButton").onclick = neueRunde;
     </script>
 </body>
