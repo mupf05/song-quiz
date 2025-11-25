@@ -73,10 +73,10 @@
             throw "Kein Video";
         }
 
-        function playSnippet(onlyAudio = false) {
+        function playSnippet(showVideo = false) {
             if (timeoutId) clearTimeout(timeoutId);
 
-            overlay.style.display = onlyAudio ? 'block' : 'none';
+            overlay.style.display = showVideo ? 'none' : 'block';
 
             player.loadVideoById({
                 videoId: videoId,
@@ -85,14 +85,12 @@
             });
             player.playVideo();
 
-            // NUR bei "nur Ton" → Timer setzen
-            if (onlyAudio) {
-                timeoutId = setTimeout(() => {
-                    player.pauseVideo();
-                    overlay.style.display = 'block';
-                    timeoutId = null;
-                }, snippetLen * 1000);
-            }
+            // Immer nur die kurze Zeit – egal ob mit oder ohne Video
+            timeoutId = setTimeout(() => {
+                player.pauseVideo();
+                overlay.style.display = 'block';
+                timeoutId = null;
+            }, snippetLen * 1000);
         }
 
         async function neueRunde() {
@@ -103,7 +101,7 @@
             try {
                 await sucheVideo(currentArtist);
                 startSec = Math.floor(Math.random() * 140) + 15;
-                playSnippet(true);  // erste Runde immer nur Ton
+                playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
                 document.getElementById("feedback").textContent = "Kein Video – nochmal Los geht’s!";
@@ -123,7 +121,7 @@
             if (currentTitle.toLowerCase().includes(guess)) {
                 if (timeoutId) clearTimeout(timeoutId);
                 overlay.style.display = 'none';
-                player.playVideo();
+                player.playVideo();   // jetzt komplett durchlaufen
                 document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
                 document.getElementById("nextButton").classList.remove("hide");
                 document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
@@ -136,22 +134,16 @@
             }
         };
 
-        // NUR TON → kurz
-        document.getElementById("repeatAudio").onclick = () => playSnippet(true);
-
-        // MIT VIDEO → komplett durch
-        document.getElementById("repeatVideo").onclick = () => playSnippet(false);
-
+        document.getElementById("repeatAudio").onclick = () => playSnippet(false);
+        document.getElementById("repeatVideo").onclick = () => playSnippet(true);  // nur kurz, aber mit Bild
         document.getElementById("giveUp").onclick = () => {
             if (timeoutId) clearTimeout(timeoutId);
             overlay.style.display = 'none';
-            player.loadVideoById({ videoId: videoId, startSeconds: startSec });
-            player.playVideo();
+            player.playVideo();   // komplett durchlaufen
             document.getElementById("feedback").innerHTML = `Aufgegeben! Es war:<br><b>${currentTitle}</b>`;
             document.getElementById("nextButton").classList.remove("hide");
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
         };
-
         document.getElementById("nextButton").onclick = neueRunde;
     </script>
 </body>
