@@ -12,8 +12,8 @@
         button:hover{background:#ff1493;}
         #player-container{position:relative;width:90%;max-width:600px;height:350px;margin:20px auto;border:5px solid #ff69b4;border-radius:15px;overflow:hidden;background:#000;}
         #player{width:100%;height:100%;border:none;}
+        #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:20;display:block;}
         #blocker{position:absolute;top:0;left:0;width:100%;height:100%;background:transparent;z-index:999;}
-        #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:10;}
         .hide{display:none;}
         #feedback{font-size:24px;margin:20px;min-height:60px;}
     </style>
@@ -21,7 +21,7 @@
 <body>
     <h1>Welcher Song ist das?</h1>
     <p>Schreib einen Künstler rein und rate!</p>
-    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez, Drake...">
+    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez, Kontra K...">
     <select id="difficulty">
         <option value="5">5 Sekunden (hart)</option>
         <option value="10" selected>10 Sekunden (normal)</option>
@@ -56,7 +56,7 @@
         const proxy = "https://corsproxy.io/?";
 
         async function sucheVideo(artist) {
-            const query = encodeURIComponent(`${artist} official music video topic -live -remix -lyrics`);
+            const query = encodeURIComponent(`${artist} official music video topic -live -remix -lyrics video`);
             const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + query);
             const resp = await fetch(url);
             const html = await resp.text();
@@ -64,39 +64,52 @@
             const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
             if (!ids.length) throw "Kein Video";
 
-            videoId = ids[Math.floor(Math.random() * Math.min(20, ids.length))];
+            videoId = ids[Math.floor(Math.random() * Math.min(15, ids.length))];
 
-            // Besserer Titel-Parser – entfernt alles vor und inklusive " - ", " | ", feat., etc.
-            const rawTitleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
-            let raw = rawTitleMatch ? rawTitleMatch[1] : "Unbekannter Song";
+            // ULTRA-SAUBERER TITEL-PARSER
+            const rawMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"text":"([^"]+)"`));
+            let raw = rawMatch ? rawMatch[1] : "Unbekannter Song";
+
             currentTitle = raw
-                .replace(/^(.*?)( - | \| |: | feat\. | ft\. | x | X )/i, "")   // alles vor dem eigentlichen Titel weg
-                .replace(/\s*\(.*?\)\s*/g, "")                                // (Official Video) etc.
-                .replace(/\[.*?\]/g, "")                                      // [Lyrics] etc.
+                .replace(/^.*?\s*[-|–—:]\s*/i, "")           // alles vor " - ", " | ", " – " weg
+                .replace(/\s*\(.*?\)\s*/g, "")              // (Official Video), (WSHH Exclusive) etc.
+                .replace(/\s*\[.*?\]\s*/g, "")              // [Lyrics] etc.
+                .replace(/official.{0,20}video|music video|lyrics|audio|feat?\.? .*|ft\.?.*|x .*/gi, "")
                 .trim();
-            if (currentTitle.length < 3) currentTitle = raw.split(/ - | \| /).pop().trim();
+
+            // Fallback falls zu kurz
+            if (currentTitle.length < 4 || currentTitle.toLowerCase().includes("gzuz")) {
+                currentTitle = raw.split(/[-|–—:]/).pop().replace(/\s*\(.*?\)/g, "").trim();
+            }
         }
 
         function playSnippet(showVideo = false) {
+            // Overlay immer an, außer bei showVideo=true
             overlay.style.display = showVideo ? 'none' : 'block';
             blocker.style.display = 'block'; // immer klick-sperre
-            player.loadVideoById({ 
-                videoId: videoId, 
+
+            player.loadVideoById({
+                videoId: videoId,
                 startSeconds: startSec,
-                // WICHTIG: diese Parameter verstecken ALLES
-                playerVars: { 
+                playerVars: {
                     controls: 0,
                     showinfo: 0,
                     modestbranding: 1,
                     fs: 0,
+                    cc_load_policy: 0,
                     iv_load_policy: 3,
                     rel: 0,
                     disablekb: 1,
-                    autoplay: 1
+                    autoplay: 1,
+                    playsinline: 1
                 }
             });
             player.playVideo();
-            setTimeout(() => player.pauseVideo(), snippetLen * 1000);
+            setTimeout(() => {
+                player.pauseVideo();
+                // WICHTIG: nach Snippet-Ende Overlay wieder aktivieren!
+                if (!showVideo) overlay.style.display = 'block';
+            }, snippetLen * 1000);
         }
 
         async function neueRunde() {
@@ -106,11 +119,11 @@
 
             try {
                 await sucheVideo(currentArtist);
-                startSec = Math.floor(Math.random() * 130) + 10;
+                startSec = Math.floor(Math.random() * 140) + 10;
                 playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
-                document.getElementById("feedback").textContent = "Kein Video gefunden – probier z.B. Gzuz, Bonez MC, RAF Camora...";
+                document.getElementById("feedback").textContent = "Kein Video gefunden – probier z.B. Gzuz, Bonez MC, Kontra K...";
             }
         }
 
@@ -125,8 +138,8 @@
         document.getElementById("guessButton").onclick = () => {
             const guess = document.getElementById("guessInput").value.toLowerCase().trim();
             if (currentTitle.toLowerCase().includes(guess)) {
-                blocker.style.display = 'none';
                 overlay.style.display = 'none';
+                blocker.style.display = 'none';
                 player.playVideo();
                 document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
                 document.getElementById("nextButton").classList.remove("hide");
@@ -144,8 +157,8 @@
         document.getElementById("repeatVideo").onclick = () => playSnippet(true);
 
         document.getElementById("giveUp").onclick = () => {
-            blocker.style.display = 'none';
             overlay.style.display = 'none';
+            blocker.style.display = 'none';
             player.loadVideoById({ videoId: videoId, startSeconds: startSec });
             player.playVideo();
             document.getElementById("feedback").innerHTML = `Aufgegeben! Es war:<br><b>${currentTitle}</b>`;
