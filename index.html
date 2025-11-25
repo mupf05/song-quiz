@@ -12,7 +12,7 @@
         button:hover{background:#ff1493;}
         #player-container{position:relative;width:90%;max-width:600px;height:350px;margin:20px auto;border:5px solid #ff69b4;border-radius:15px;overflow:hidden;background:#000;}
         #player{width:100%;height:100%;border:none;}
-        #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:20;display:block;}
+        #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:20;}
         #blocker{position:absolute;top:0;left:0;width:100%;height:100%;background:transparent;z-index:999;}
         .hide{display:none;}
         #feedback{font-size:24px;margin:20px;min-height:60px;}
@@ -52,78 +52,73 @@
         let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
         const overlay = document.getElementById("black-overlay");
         const blocker = document.getElementById("blocker");
-
         const proxy = "https://corsproxy.io/?";
 
         async function sucheVideo(artist) {
-            const query = encodeURIComponent(`${artist} official music video topic -live -remix -lyrics video`);
+            // ULTRA-STRENGER SUCHSTRING – nur echte Official Videos!
+            const query = encodeURIComponent(`${artist} "official music video" OR "offizielles video" OR topic -reaction -reacts -live -interview -remix -lyrics -audio`);
             const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + query);
             const resp = await fetch(url);
             const html = await resp.text();
 
-            const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
-            if (!ids.length) throw "Kein Video";
+            // Nur Video-IDs aus echten Suchergebnissen (nicht aus "Up next")
+            const idMatches = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})[^"]*?"text":"[^"]*(official|offiziell|music video)[^"]*"/gi)]
+                              .map(m => m[1]);
+            
+            if (idMatches.length === 0) throw "Kein offizielles Video";
 
-            videoId = ids[Math.floor(Math.random() * Math.min(15, ids.length))];
+            videoId = idMatches[Math.floor(Math.random() * idMatches.length)];
 
-            // ULTRA-SAUBERER TITEL-PARSER
-            const rawMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"text":"([^"]+)"`));
-            let raw = rawMatch ? rawMatch[1] : "Unbekannter Song";
+            // Perfekter Titel-Parser
+            const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"text":"([^"]+)"`));
+            let raw = titleMatch ? titleMatch[1] : "Song";
 
             currentTitle = raw
-                .replace(/^.*?\s*[-|–—:]\s*/i, "")           // alles vor " - ", " | ", " – " weg
-                .replace(/\s*\(.*?\)\s*/g, "")              // (Official Video), (WSHH Exclusive) etc.
-                .replace(/\s*\[.*?\]\s*/g, "")              // [Lyrics] etc.
-                .replace(/official.{0,20}video|music video|lyrics|audio|feat?\.? .*|ft\.?.*|x .*/gi, "")
+                .replace(/^.*?\s*[-|–—:]\s*/i, "")
+                .replace(/\s*\(.*?\)\s*/g, "")
+                .replace(/\s*\[.*?\]\s*/g, "")
+                .replace(/official.{0,30}video|offizielles video|music video|lyrics|audio|hd|4k|feat?\.?.*|ft\.?.*|x .*/gi, "")
                 .trim();
 
-            // Fallback falls zu kurz
-            if (currentTitle.length < 4 || currentTitle.toLowerCase().includes("gzuz")) {
+            if (currentTitle.length < 5) {
                 currentTitle = raw.split(/[-|–—:]/).pop().replace(/\s*\(.*?\)/g, "").trim();
             }
         }
 
         function playSnippet(showVideo = false) {
-            // Overlay immer an, außer bei showVideo=true
             overlay.style.display = showVideo ? 'none' : 'block';
-            blocker.style.display = 'block'; // immer klick-sperre
+            blocker.style.display = 'block';
 
             player.loadVideoById({
                 videoId: videoId,
                 startSeconds: startSec,
                 playerVars: {
-                    controls: 0,
-                    showinfo: 0,
-                    modestbranding: 1,
-                    fs: 0,
-                    cc_load_policy: 0,
-                    iv_load_policy: 3,
-                    rel: 0,
-                    disablekb: 1,
-                    autoplay: 1,
-                    playsinline: 1
+                    controls: 0, modestbranding: 1, fs: 0, rel: 0, 
+                    iv_load_policy: 3, disablekb: 1, autoplay: 1,
+                    playsinline: 1, enablejsapi: 1
                 }
             });
             player.playVideo();
+
             setTimeout(() => {
                 player.pauseVideo();
-                // WICHTIG: nach Snippet-Ende Overlay wieder aktivieren!
                 if (!showVideo) overlay.style.display = 'block';
             }, snippetLen * 1000);
         }
 
         async function neueRunde() {
             document.getElementById("feedback").textContent = "Lade Song...";
-            document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp,#nextButton").forEach(b => b.classList.add("hide"));
+            document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp,#nextButton")
+                .forEach(b => b.classList.add("hide"));
             document.getElementById("guessInput").value = "";
 
             try {
                 await sucheVideo(currentArtist);
-                startSec = Math.floor(Math.random() * 140) + 10;
+                startSec = Math.floor(Math.random() * 140) + 15;
                 playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
-                document.getElementById("feedback").textContent = "Kein Video gefunden – probier z.B. Gzuz, Bonez MC, Kontra K...";
+                document.getElementById("feedback").textContent = "Kein offizielles Video gefunden – probier „Gzuz“, „Bonez MC“, „Kontra K“...";
             }
         }
 
@@ -155,7 +150,6 @@
 
         document.getElementById("repeatAudio").onclick = () => playSnippet(false);
         document.getElementById("repeatVideo").onclick = () => playSnippet(true);
-
         document.getElementById("giveUp").onclick = () => {
             overlay.style.display = 'none';
             blocker.style.display = 'none';
@@ -165,7 +159,6 @@
             document.getElementById("nextButton").classList.remove("hide");
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
         };
-
         document.getElementById("nextButton").onclick = neueRunde;
     </script>
 </body>
