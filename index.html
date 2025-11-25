@@ -10,6 +10,7 @@
         input,button,select{padding:12px;font-size:18px;margin:8px;border-radius:10px;}
         button{background:#ff69b4;color:white;border:none;cursor:pointer;}
         button:hover{background:#ff1493;}
+        button:disabled{background:#ccc;cursor:not-allowed;}
         #player-container{position:relative;width:90%;max-width:600px;height:350px;margin:20px auto;border:5px solid #ff69b4;border-radius:15px;overflow:hidden;background:#000;}
         #player{width:100%;height:480px !important;margin-top:-80px;pointer-events:none;}
         #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:10;}
@@ -20,23 +21,21 @@
 <body>
     <h1>Welcher Song ist das?</h1>
     <p>Schreib einen Künstler rein und rate!</p>
-    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC...">
+    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC..." value="Gzuz">
     <select id="difficulty">
-        <option value="0.1">0.1 Sekunden (extrem hart)</option>
-        <option value="0.2">0.2 Sekunden (extrem hart)</option>
-        <option value="0.3">0.3 Sekunden (extrem hart)</option>
-        <option value="0.4">0.4 Sekunden (extrem hart)</option>
-        <option value="0.5">0.5 Sekunden (hart)</option>
-        <option value="1">1 Sekunde (hart)</option>
-        <option value="2">2 Sekunden (hart)</option>
-        <option value="3">3 Sekunden (hart)</option>
-        <option value="4">4 Sekunden (hart)</option>
-        <option value="5" selected>5 Sekunden (normal)</option>
-        <option value="10">10 Sekunden (einfach)</option>
-        <option value="15">15 Sekunden (einfach)</option>
-        <option value="20">20 Sekunden (easy)</option>
-        <option value="25">25 Sekunden (easy)</option>
-        <option value="30">30 Sekunden (easy)</option>
+        <option value="0.1">0.1 Sekunden (unmöglich)</option>
+        <option value="0.2">0.2 Sekunden (krank)</option>
+        <option value="0.3">0.3 Sekunden (krank)</option>
+        <option value="0.4">0.4 Sekunden (hart)</option>
+        <option value="0.5" selected>0.5 Sekunden (hart)</option>
+        <option value="1">1 Sekunde</option>
+        <option value="2">2 Sekunden</option>
+        <option value="3">3 Sekunden</option>
+        <option value="5">5 Sekunden</option>
+        <option value="10">10 Sekunden</option>
+        <option value="15">15 Sekunden</option>
+        <option value="20">20 Sekunden</option>
+        <option value="30">30 Sekunden</option>
     </select>
     <button id="startButton">Los geht's!</button>
 
@@ -51,7 +50,7 @@
         <button id="guessButton">Raten!</button>
         <br>
         <button id="repeatAudio" class="hide">Nochmal hören (nur Ton)</button>
-        <button id="repeatVideo" class="hide">Mit Video hören</button>
+        <button id="repeatVideo" class="hide" disabled>Mit Video hören (nicht verfügbar)</button>
         <button id="giveUp" class="hide">Aufgeben & alles zeigen</button>
         <button id="nextButton" class="hide">Nächster Song</button>
         <p id="feedback"></p>
@@ -59,54 +58,53 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
+        let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 0.5, currentArtist = "";
         let timeoutId = null;
+        let hasVideo = true;
         const overlay = document.getElementById("black-overlay");
-        const proxy = "https://api.allorigins.win/raw?url=";
+        const repeatVideoBtn = document.getElementById("repeatVideo");
 
         async function sucheVideo(artist) {
+            hasVideo = true;
             const queries = [
-                `${artist} official music video`,
-                `${artist} offizielles video`,
-                `${artist} music video -live -reaction`,
-                `${artist} topic -live`,
-                `${artist} -topic`
+                `${artist} official audio`,
+                `${artist} topic`,
+                `${artist} -topic audio`,
+                `${artist} full song`,
+                `${artist} lyrics`
             ];
             const query = queries[Math.floor(Math.random() * queries.length)];
 
-            // Zufällige Variation für Vielfalt (z.B. "album", "track", "full")
-            const variation = ["", " album", " track", " full", " hd"][Math.floor(Math.random() * 5)];
-            const finalQuery = query + variation;
-
-            const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(finalQuery));
+            const url = `https://api.allorigins.win/raw?url=${encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(query))}`;
             const resp = await fetch(url);
             const html = await resp.text();
 
             const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
-            if (ids.length < 5) throw "Keine Videos";
+            if (ids.length === 0) throw "Keine Ergebnisse";
 
-            videoId = ids[Math.floor(Math.random() * Math.min(150, ids.length))];  // aus bis zu 150 Ergebnissen
+            videoId = ids[Math.floor(Math.random() * Math.min(100, ids.length))];
 
+            // Titel holen
             const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
-            let raw = titleMatch ? titleMatch[1] : "Song";
+            let raw = titleMatch ? titleMatch[1] : artist + " Song";
 
             currentTitle = raw
                 .replace(new RegExp(`^${artist}\\s*[-|–—:]\\s*`, 'i'), '')
-                .replace(/\s*[\(\[]?(official|offiziell|music video|audio|lyrics|hd|4k|vevo|topic).*?[\)\]]?/gi, '')
-                .replace(/\s*[-|–—:]\s*.*/g, '')
-                .trim();
-
-            if (currentTitle.length < 3) currentTitle = "Unbekannter Song";
+                .replace(/\s*[\(\[]?(official|offiziell|audio|lyrics|hd|topic|vevo|music video).*?/gi, '')
+                .replace(/\s*[-|–—:].*/g, '')
+                .trim() || "Unbekannter Song";
         }
 
         function playSnippet(showVideo = false) {
             if (timeoutId) clearTimeout(timeoutId);
+
+            if (!hasVideo) showVideo = false;
             overlay.style.display = showVideo ? 'none' : 'block';
 
             player.loadVideoById({
                 videoId: videoId,
                 startSeconds: startSec,
-                playerVars: { controls:0, showinfo:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, autoplay:1 }
+                playerVars: { controls:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, autoplay:1 }
             });
             player.playVideo();
 
@@ -117,26 +115,50 @@
         }
 
         async function neueRunde() {
-            document.getElementById("feedback").textContent = "Lade Song...";
+            document.getElementById("feedback").innerHTML = "Lade Song...";
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp,#nextButton").forEach(b => b.classList.add("hide"));
             document.getElementById("guessInput").value = "";
+            repeatVideoBtn.disabled = true;
+            repeatVideoBtn.textContent = "Mit Video hören (nicht verfügbar)";
 
             try {
                 await sucheVideo(currentArtist);
                 startSec = Math.floor(Math.random() * 180) + 20;
-                playSnippet(false);
-                document.getElementById("feedback").textContent = "Hör genau hin!";
+                hasVideo = true;
+                repeatVideoBtn.disabled = false;
+                repeatVideoBtn.textContent = "Mit Video hören";
             } catch (e) {
-                document.getElementById("feedback").textContent = "Kein Video – nochmal „Los geht’s!“ drücken!";
+                // Fallback: versuche Topic-Channel (fast immer Audio)
+                try {
+                    const fallback = `https://api.allorigins.win/raw?url=${encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(currentArtist + " topic"))}`;
+                    const resp2 = await fetch(fallback);
+                    const html2 = await resp2.text();
+                    const ids2 = [...html2.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
+                    if (ids2.length > 0) {
+                        videoId = ids2[0];
+                        currentTitle = currentArtist + " Song (Topic)";
+                        hasVideo = false;
+                        startSec = Math.floor(Math.random() * 180) + 20;
+                    }
+                } catch {}
             }
+
+            // Immer abspielen – auch wenn nur Audio
+            playSnippet(false);
+            document.getElementById("feedback").textContent = hasVideo ? "Hör genau hin!" : "Nur Ton verfügbar – hör genau hin!";
+            document.getElementById("repeatAudio").classList.remove("hide");
+            if (hasVideo) document.getElementById("repeatVideo").classList.remove("hide");
         }
 
         document.getElementById("startButton").onclick = () => {
-            currentArtist = document.getElementById("artistInput").value.trim();
-            if (!currentArtist) return alert("Künstler eingeben!");
-            snippetLen = parseInt(document.getElementById("difficulty").value);
+            currentArtist = document.getElementById("artistInput").value.trim() || "Gzuz";
+            snippetLen = parseFloat(document.getElementById("difficulty").value);
             document.getElementById("quizArea").classList.remove("hide");
-            neueRunde();
+            if (!player) {
+                player = new YT.Player('player', { events: { onReady: neueRunde }});
+            } else {
+                neueRunde();
+            }
         };
 
         document.getElementById("guessButton").onclick = () => {
@@ -151,7 +173,7 @@
             } else {
                 document.getElementById("feedback").textContent = "Leider falsch – nochmal versuchen?";
                 document.getElementById("repeatAudio").classList.remove("hide");
-                document.getElementById("repeatVideo").classList.remove("hide");
+                if (hasVideo) document.getElementById("repeatVideo").classList.remove("hide");
                 document.getElementById("giveUp").classList.remove("hide");
                 document.getElementById("guessInput").value = "";
             }
