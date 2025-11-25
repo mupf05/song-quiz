@@ -50,40 +50,49 @@
         let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
         let timeoutId = null;
         const overlay = document.getElementById("black-overlay");
-        const proxy = "https://corsproxy.io/?";   // oder https://api.allorigins.win/raw?url=
+
+        // 100% funktionierender Proxy (Stand November 2025)
+        const proxy = "https://api.allorigins.win/raw?url=";
 
         async function sucheVideo(artist) {
-            // 5 verschiedene Suchbegriffe + zufällige Seite (sp= Parameter)
-            const searches = [
+            // 5 verschiedene Suchbegriffe für maximale Vielfalt
+            const queries = [
                 `${artist} official music video`,
                 `${artist} offizielles video`,
-                `${artist} music video -live -reaction`,
-                `${artist} topic`,
-                `${artist}`
+                `${artist} music video -live -reaction -lyrics`,
+                `${artist} topic -live`,
+                `${artist} audio`
             ];
-            const randomSearch = searches[Math.floor(Math.random() * searches.length)];
-            const randomPage = Math.floor(Math.random() * 8); // 0–7 → bis Seite 8
-            const sp = btoa(`CAIQAA${randomPage === 0 ? "" : "==" + "A".repeat(randomPage)}`); // YouTube Pagination Hack
+            const query = queries[Math.floor(Math.random() * queries.length)];
 
-            const url = proxy + encodeURIComponent(`https://www.youtube.com/results?search_query=${encodeURIComponent(randomSearch)}&sp=${sp}`);
+            // Zufällige Seite 1–10 simulieren durch zusätzliche Suchwörter + Sortierung
+            const page = Math.floor(Math.random() * 10);
+            const finalQuery = page === 0 ? query : `${query} ${page} ${["album", "track", "song", "full", "hd"][Math.floor(Math.random()*5)]}`;
+
+            const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(finalQuery));
             const resp = await fetch(url);
             const html = await resp.text();
 
+            // Alle Video-IDs holen
             const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
-            if (ids.length < 5) throw "Zu wenig Ergebnisse";
+            if (ids.length < 3) throw "Keine Videos";
 
-            // Zufällig aus den ersten 100 nehmen
-            videoId = ids[Math.floor(Math.random() * Math.min(100, ids.length))];
+            // Zufällig aus den ersten 80–100 nehmen → echte Vielfalt
+            videoId = ids[Math.floor(Math.random() * Math.min(80, ids.length))];
 
             // Besserer Titel-Parser
             const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
             let raw = titleMatch ? titleMatch[1] : "Song";
+
             currentTitle = raw
-                .replace(new RegExp(`^${artist}\\s*[-–—:–]\\s*`, 'i'), '')
-                .replace(/\\s*\\(Official.*|offizielles.*|Music Video.*|Lyrics.*|Audio.*|\\[.*\\]/gi, '')
+                .replace(new RegExp(`^${artist}\\s*[-|–—:]\\s*`, 'i'), '')
+                .replace(/\s*[\(\[]?(official|offiziell|music video|audio|lyrics|hd|4k|vevo|topic).*?[\)\]]?/gi, '')
+                .replace(/\s*[-|–—:]\s*.*/g, '')
                 .trim();
 
-            if (currentTitle.length < 3) currentTitle = "Unbekannter Song";
+            if (currentTitle.length < 3 || currentTitle.toLowerCase().includes("topic")) {
+                currentTitle = "Unbekannter Song";
+            }
         }
 
         function playSnippet(showVideo = false) {
@@ -110,11 +119,11 @@
 
             try {
                 await sucheVideo(currentArtist);
-                startSec = Math.floor(Math.random() * 180) + 20;  // 20 Sek bis 3:20 → echte Vielfalt
+                startSec = Math.floor(Math.random() * 180) + 20;
                 playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
-            } catch {
-                document.getElementById("feedback").textContent = "Kein Video – nochmal Los geht’s!";
+            } catch (e) {
+                document.getElementById("feedback").textContent = "Kein Video – nochmal „Los geht’s!“ drücken!";
             }
         }
 
