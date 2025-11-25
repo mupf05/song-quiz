@@ -60,10 +60,11 @@
                     const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(q));
                     const resp = await fetch(url);
                     const html = await resp.text();
-                    const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]).slice(0,20);
-                    if (ids.length === 0) continue;
+                    const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
+                    if (ids.length < 10) continue;  // mindestens 10 Ergebnisse
 
-                    videoId = ids[Math.floor(Math.random() * ids.length)];
+                    // Zufälliges aus den ersten 50 (mehr Vielfalt)
+                    videoId = ids[Math.floor(Math.random() * Math.min(50, ids.length))];
                     const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"text":"([^"]+)"`));
                     let raw = titleMatch ? titleMatch[1] : "Song";
                     currentTitle = raw.split(/[-|–—:]/).pop().replace(/\s*\(.*?\)|\s*\[.*?\]|official.{0,30}video|music video|lyrics|vevo|topic|feat.*|ft.*/gi,"").trim();
@@ -121,7 +122,7 @@
             if (currentTitle.toLowerCase().includes(guess)) {
                 if (timeoutId) clearTimeout(timeoutId);
                 overlay.style.display = 'none';
-                player.playVideo();   // jetzt komplett durchlaufen
+                player.playVideo();  // komplett durch
                 document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
                 document.getElementById("nextButton").classList.remove("hide");
                 document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
@@ -135,11 +136,11 @@
         };
 
         document.getElementById("repeatAudio").onclick = () => playSnippet(false);
-        document.getElementById("repeatVideo").onclick = () => playSnippet(true);  // nur kurz, aber mit Bild
+        document.getElementById("repeatVideo").onclick = () => playSnippet(true);
         document.getElementById("giveUp").onclick = () => {
             if (timeoutId) clearTimeout(timeoutId);
             overlay.style.display = 'none';
-            player.playVideo();   // komplett durchlaufen
+            player.playVideo();  // komplett durch
             document.getElementById("feedback").innerHTML = `Aufgegeben! Es war:<br><b>${currentTitle}</b>`;
             document.getElementById("nextButton").classList.remove("hide");
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
