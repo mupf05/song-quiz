@@ -10,10 +10,31 @@
         input,button,select{padding:12px;font-size:18px;margin:8px;border-radius:10px;}
         button{background:#ff69b4;color:white;border:none;cursor:pointer;}
         button:hover{background:#ff1493;}
-        #player-container{position:relative;width:90%;max-width:600px;height:350px;margin:20px auto;border:5px solid #ff69b4;border-radius:15px;overflow:hidden;background:#000;}
-        #player{width:100%;height:100%;border:none;}
-        #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:99;}
-        #blocker{position:absolute;top:-50px;left:0;width:100%;height:calc(100% + 100px);background:transparent;z-index:9999;cursor:pointer;}
+        
+        /* HIER IST DIE LÖSUNG: Player wird nach unten verschoben + oberer Teil abgeschnitten */
+        #player-container {
+            position: relative;
+            width: 90%;
+            max-width: 600px;
+            height: 350px;
+            margin: 20px auto;
+            border: 5px solid #ff69b4;
+            border-radius: 15px;
+            overflow: hidden;
+            background: #000;
+        }
+        #player {
+            width: 100%;
+            height: 480px !important;     /* höher als Container */
+            margin-top: -80px;             /* schiebt das Video nach oben → Titel verschwindet */
+            pointer-events: none;          /* komplett unklickbar */
+        }
+        #black-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            z-index: 10;
+        }
         .hide{display:none;}
         #feedback{font-size:24px;margin:20px;min-height:60px;}
     </style>
@@ -21,7 +42,7 @@
 <body>
     <h1>Welcher Song ist das?</h1>
     <p>Schreib einen Künstler rein und rate!</p>
-    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC, Kontra K...">
+    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC...">
     <select id="difficulty">
         <option value="5">5 Sekunden (hart)</option>
         <option value="10" selected>10 Sekunden (normal)</option>
@@ -34,7 +55,6 @@
         <div id="player-container">
             <div id="player"></div>
             <div id="black-overlay"></div>
-            <div id="blocker"></div>
         </div>
         <br>
         <input type="text" id="guessInput" placeholder="Songtitel eingeben">
@@ -51,37 +71,23 @@
     <script>
         let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
         const overlay = document.getElementById("black-overlay");
-        const blocker = document.getElementById("blocker");
         const proxy = "https://corsproxy.io/?";
 
         async function sucheVideo(artist) {
-            const queries = [
-                `${artist} official music video`, `${artist} offizielles video`,
-                `${artist} music video`, `${artist} vevo`, `${artist} topic`
-            ];
-
-            for (let q of queries) {
+            const queries = ["official music video", "offizielles video", "music video", "vevo", "topic"];
+            for (let term of queries) {
                 try {
+                    const q = `${artist} ${term}`;
                     const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(q));
                     const resp = await fetch(url);
                     const html = await resp.text();
+                    const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]).slice(0,20);
+                    if (ids.length === 0) continue;
 
-                    const candidates = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)]
-                        .map(m => m[1]).slice(0, 20);
-                    if (!candidates.length) continue;
-
-                    videoId = candidates[Math.floor(Math.random() * candidates.length)];
-
+                    videoId = ids[Math.floor(Math.random() * ids.length)];
                     const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"text":"([^"]+)"`));
-                    let raw = titleMatch ? titleMatch[1] : artist + " Song";
-
-                    currentTitle = raw
-                        .split(/[-|–—:]/).pop()
-                        .replace(/\s*\(.*?\)\s*/g, "")
-                        .replace(/\s*\[.*?\]\s*/g, "")
-                        .replace(/official.{0,30}video|music video|lyrics|audio|hd|4k|vevo|topic|feat.*|ft.*/gi, "")
-                        .trim();
-
+                    let raw = titleMatch ? titleMatch[1] : "Song";
+                    currentTitle = raw.split(/[-|–—:]/).pop().replace(/\s*\(.*?\)|\s*\[.*?\]|official.{0,30}video|music video|lyrics|vevo|topic|feat.*|ft.*/gi,"").trim();
                     if (currentTitle.length > 3) return;
                 } catch(e) {}
             }
@@ -90,31 +96,13 @@
 
         function playSnippet(showVideo = false) {
             overlay.style.display = showVideo ? 'none' : 'block';
-            blocker.style.display = 'block';
-
             player.loadVideoById({
                 videoId: videoId,
                 startSeconds: startSec,
-                playerVars: {
-                    controls: 0,
-                    showinfo: 0,
-                    modestbranding: 1,
-                    fs: 0,
-                    rel: 0,
-                    iv_load_policy: 3,
-                    disablekb: 1,
-                    autoplay: 1,
-                    playsinline: 1,
-                    cc_load_policy: 0,
-                    widget_referrer: window.location.href
-                }
+                playerVars: { controls:0, showinfo:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, autoplay:1 }
             });
             player.playVideo();
-
-            setTimeout(() => {
-                player.pauseVideo();
-                if (!showVideo) overlay.style.display = 'block';
-            }, snippetLen * 1000);
+            setTimeout(() => player.pauseVideo(), snippetLen * 1000);
         }
 
         async function neueRunde() {
@@ -128,7 +116,7 @@
                 playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
-                document.getElementById("feedback").textContent = "Kein Video – nochmal „Los geht’s!“ oder anderen Künstler probieren";
+                document.getElementById("feedback").textContent = "Kein Video – nochmal Los geht’s! oder anderen Künstler";
             }
         }
 
@@ -144,7 +132,6 @@
             const guess = document.getElementById("guessInput").value.toLowerCase().trim();
             if (currentTitle.toLowerCase().includes(guess)) {
                 overlay.style.display = 'none';
-                blocker.style.display = 'none';
                 player.playVideo();
                 document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
                 document.getElementById("nextButton").classList.remove("hide");
@@ -162,7 +149,6 @@
         document.getElementById("repeatVideo").onclick = () => playSnippet(true);
         document.getElementById("giveUp").onclick = () => {
             overlay.style.display = 'none';
-            blocker.style.display = 'none';
             player.loadVideoById({ videoId: videoId, startSeconds: startSec });
             player.playVideo();
             document.getElementById("feedback").innerHTML = `Aufgegeben! Es war:<br><b>${currentTitle}</b>`;
