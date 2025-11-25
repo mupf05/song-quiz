@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="strict-origin-when-cross-origin">
-    <title>Song-Quiz</title>
+    <title>Welcher Song ist das?</title>
     <style>
         body { font-family: Arial; text-align: center; background: #f0f8ff; padding: 20px; }
         h1 { color: #ff69b4; }
@@ -16,17 +16,15 @@
     </style>
 </head>
 <body>
-    <h1>Welcher Song ist das?</h1>
+    <h1>🎵 Welcher Song ist das? 🎵</h1>
     <p>Schreib einen Künstler rein und rate!</p>
 
     <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC, Eminem...">
-    <br>
     <select id="snippetLength">
         <option value="5">5 Sekunden (hart)</option>
         <option value="10" selected>10 Sekunden (normal)</option>
         <option value="20">20 Sekunden (easy)</option>
     </select>
-    <br>
     <button id="startButton">Los geht’s!</button>
 
     <div id="quizArea" class="hide">
@@ -71,10 +69,25 @@
                     height: '350', width: '600',
                     videoId: videoId,
                     host: 'https://www.youtube-nocookie.com',
-                    playerVars: { autoplay: 1, controls: 0, start: start, modestbranding: 1, rel: 0, origin: window.location.origin },
+                    playerVars: {
+                        autoplay: 1,
+                        controls: 0,
+                        start: start,
+                        modestbranding: 1,
+                        rel: 0,
+                        fs: 0,
+                        cc_load_policy: 0,
+                        iv_load_policy: 3,
+                        autohide: 1,
+                        color: 'white',
+                        origin: window.location.origin
+                    },
                     events: {
-                        onReady: () => { player.playVideo(); document.getElementById("feedback").textContent = "Hör genau hin!"; setTimeout(() => player.pauseVideo(), laenge * 1000); },
-                        onError: () => { document.getElementById("player").innerHTML = `<p>Fehler – <a href="https://www.youtube.com/watch?v=${videoId}&t=${start}s" target="_blank">auf YouTube hören</a></p>`; }
+                        onReady: () => {
+                            player.playVideo();
+                            document.getElementById("feedback").textContent = "Hör genau hin! 🎧";
+                            setTimeout(() => player.pauseVideo(), laenge * 1000);
+                        }
                     }
                 });
             } catch { document.getElementById("feedback").textContent = "Kein Song gefunden – anderer Künstler?"; }
@@ -83,9 +96,9 @@
         document.getElementById("guessButton").onclick = () => {
             const tipp = document.getElementById("guessInput").value.toLowerCase().trim();
             if (tipp && currentTitle.toLowerCase().includes(tipp)) {
-                document.getElementById("feedback").innerHTML = `RICHTIG! Es war: <b>${currentTitle}</b>`;
+                document.getElementById("feedback").innerHTML = `RICHTIG! 🎉 Es war: <b>${currentTitle}</b>`;
             } else {
-                document.getElementById("feedback").innerHTML = `Falsch Es war: <b>${currentTitle}</b>`;
+                document.getElementById("feedback").innerHTML = `Falsch 😭 Es war: <b>${currentTitle}</b>`;
             }
         };
 
