@@ -10,13 +10,14 @@
         input, button, select { padding: 12px; font-size: 18px; margin: 10px; border-radius: 10px; }
         button { background: #ff69b4; color: white; border: none; cursor: pointer; }
         button:hover { background: #ff1493; }
-        #player { width: 90%; max-width: 600px; height: 350px; margin: 20px auto; border: 5px solid #ff69b4; border-radius: 15px; background:#000; }
+        #player-container { position: relative; width: 90%; max-width: 600px; height: 350px; margin: 20px auto; border: 5px solid #ff69b4; border-radius: 15px; overflow: hidden; background:#000; }
+        #player { position: absolute; top: -100px; left: -100px; width: 100px; height: 100px; } /* komplett aus dem Bildschirm schieben */
         #feedback { font-size: 24px; margin: 20px; }
         .hide { display: none; }
     </style>
 </head>
 <body>
-    <h1>🎵 Welcher Song ist das? 🎵</h1>
+    <h1>Welcher Song ist das?</h1>
     <p>Schreib einen Künstler rein und rate!</p>
 
     <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC, Eminem...">
@@ -29,7 +30,9 @@
 
     <div id="quizArea" class="hide">
         <p>Hör genau hin!</p>
-        <div id="player"></div>
+        <div id="player-container">
+            <div id="player"></div>
+        </div>
         <br>
         <input type="text" id="guessInput" placeholder="Songtitel eingeben">
         <button id="guessButton">Raten!</button>
@@ -66,9 +69,7 @@
                 const start = Math.floor(Math.random() * 120);
 
                 player = new YT.Player('player', {
-                    height: '350', width: '600',
                     videoId: videoId,
-                    host: 'https://www.youtube-nocookie.com',
                     playerVars: {
                         autoplay: 1,
                         controls: 0,
@@ -76,29 +77,30 @@
                         modestbranding: 1,
                         rel: 0,
                         fs: 0,
-                        cc_load_policy: 0,
                         iv_load_policy: 3,
-                        autohide: 1,
-                        color: 'white',
+                        cc_load_policy: 0,
+                        disablekb: 1,
                         origin: window.location.origin
                     },
                     events: {
                         onReady: () => {
                             player.playVideo();
-                            document.getElementById("feedback").textContent = "Hör genau hin! 🎧";
+                            document.getElementById("feedback").textContent = "Hör genau hin!";
                             setTimeout(() => player.pauseVideo(), laenge * 1000);
                         }
                     }
                 });
-            } catch { document.getElementById("feedback").textContent = "Kein Song gefunden – anderer Künstler?"; }
+            } catch {
+                document.getElementById("feedback").textContent = "Kein Song gefunden – anderer Künstler?";
+            }
         };
 
         document.getElementById("guessButton").onclick = () => {
             const tipp = document.getElementById("guessInput").value.toLowerCase().trim();
             if (tipp && currentTitle.toLowerCase().includes(tipp)) {
-                document.getElementById("feedback").innerHTML = `RICHTIG! 🎉 Es war: <b>${currentTitle}</b>`;
+                document.getElementById("feedback").innerHTML = `RICHTIG! Es war: <b>${currentTitle}</b>`;
             } else {
-                document.getElementById("feedback").innerHTML = `Falsch 😭 Es war: <b>${currentTitle}</b>`;
+                document.getElementById("feedback").innerHTML = `Falsch Es war: <b>${currentTitle}</b>`;
             }
         };
 
