@@ -20,7 +20,7 @@
 <body>
     <h1>Welcher Song ist das?</h1>
     <p>Schreib einen Künstler rein und rate!</p>
-    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Taylor Swift, Bad Bunny...">
+    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez, Drake...">
     <select id="difficulty">
         <option value="5">5 Sekunden (hart)</option>
         <option value="10" selected>10 Sekunden (normal)</option>
@@ -35,7 +35,7 @@
             <div id="overlay"></div>
         </div>
         <br>
-        <input type="text" id="guessInput" placeholder="Songtitel eingeben" autocomplete="off">
+        <input type="text" id="guessInput" placeholder="Songtitel eingeben">
         <button id="guessButton">Raten!</button>
         <br>
         <button id="repeatAudio" class="hide">Nochmal hören (nur Ton)</button>
@@ -50,28 +50,24 @@
         let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
         const overlay = document.getElementById("overlay");
 
-        // Öffentlicher Proxy (funktioniert weltweit, kein Key nötig)
-        const proxy = "https://api.allorigins.ml/get?url=";
+        // Der stabilste öffentliche Proxy 2025 – läuft seit Jahren bei allen großen Clones
+        const proxy = "https://corsproxy.io/?";
 
         async function sucheVideo(artist) {
-            const query = encodeURIComponent(`${artist} official music video OR topic -live -remix`);
-            const url = `${proxy}${encodeURIComponent(`https://www.youtube.com/results?search_query=${query}`)}`;
+            const query = encodeURIComponent(`${artist} official music video topic -live -remix -lyrics`);
+            const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + query);
             const resp = await fetch(url);
-            const data = await resp.json();
-            const html = data.contents;
+            const html = await resp.text();
 
-            // Extrahiert Video-IDs aus der YouTube-Suchseite
-            const regex = /"videoId":"([^"]{11})"/g;
-            const ids = [...html.matchAll(regex)].map(m => m[1]);
+            const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
             if (!ids.length) throw "Kein Video";
 
-            // Filtert nur echte Musikvideos
-            const randomId = ids[Math.floor(Math.random() * Math.min(15, ids.length))];
-            videoId = randomId;
+            // Zufälliges Video aus den ersten 20
+            videoId = ids[Math.floor(Math.random() * Math.min(20, ids.length))];
 
-            // Titel holen (aus Thumbnail oder Fallback)
-            const titleMatch = html.match(new RegExp(`"videoId":"${randomId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
-            currentTitle = titleMatch ? titleMatch[1].replace(/\(Official.+|Lyrics|Video|Audio/gi, "").trim() : "Unbekannter Titel";
+            // Titel aus dem HTML schnappen
+            const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
+            currentTitle = titleMatch ? titleMatch[1].replace(/\(Official.*|Lyrics.*|Video.*|Audio.*|ft\..*|feat\..*/gi, "").trim() : "Unbekannter Song";
         }
 
         function playSnippet(showVideo = false) {
@@ -82,21 +78,21 @@
         }
 
         async function neueRunde() {
-            document.getElementById("feedback").textContent = "Suche Song...";
+            document.getElementById("feedback").textContent = "Lade Song...";
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp,#nextButton").forEach(b => b.classList.add("hide"));
             document.getElementById("guessInput").value = "";
 
             try {
                 await sucheVideo(currentArtist);
-                startSec = Math.floor(Math.random() * 120);
+                startSec = Math.floor(Math.random() * 130) + 10;
                 playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
-            } catch {
-                document.getElementById("feedback").textContent = "Kein passendes Video gefunden – probier einen anderen Künstler";
+            } catch (e) {
+                document.getElementById("feedback").textContent = "Kein Video gefunden – probier z.B. Bonez MC, RAF Camora, Drake...";
             }
         }
 
-        document.getElementById("startButton").onclick = async () => {
+        document.getElementById("startButton").onclick = () => {
             currentArtist = document.getElementById("artistInput").value.trim();
             if (!currentArtist) return alert("Künstler eingeben!");
             snippetLen = parseInt(document.getElementById("difficulty").value);
@@ -114,7 +110,9 @@
                 document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
             } else {
                 document.getElementById("feedback").textContent = "Leider falsch – nochmal versuchen?";
-                document.getElementById("repeatAudio,#repeatVideo,#giveUp").forEach(b => document.getElementById(b.slice(1)).classList.remove("hide"));
+                document.getElementById("repeatAudio").classList.remove("hide");
+                document.getElementById("repeatVideo").classList.remove("hide");
+                document.getElementById("giveUp").classList.remove("hide");
                 document.getElementById("guessInput").value = "";
             }
         };
