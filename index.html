@@ -22,11 +22,23 @@
     <p>Schreib einen Künstler rein und rate!</p>
     <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC...">
     <select id="difficulty">
-        <option value="5">5 Sekunden (hart)</option>
-        <option value="10" selected>10 Sekunden (normal)</option>
+        <option value="0.1">0.1 Sekunden (extrem hart)</option>
+        <option value="0.2">0.2 Sekunden (extrem hart)</option>
+        <option value="0.3">0.3 Sekunden (extrem hart)</option>
+        <option value="0.4">0.4 Sekunden (extrem hart)</option>
+        <option value="0.5">0.5 Sekunden (hart)</option>
+        <option value="1">1 Sekunde (hart)</option>
+        <option value="2">2 Sekunden (hart)</option>
+        <option value="3">3 Sekunden (hart)</option>
+        <option value="4">4 Sekunden (hart)</option>
+        <option value="5" selected>5 Sekunden (normal)</option>
+        <option value="10">10 Sekunden (einfach)</option>
+        <option value="15">15 Sekunden (einfach)</option>
         <option value="20">20 Sekunden (easy)</option>
+        <option value="25">25 Sekunden (easy)</option>
+        <option value="30">30 Sekunden (easy)</option>
     </select>
-    <button id="startButton">Los geht’s!</button>
+    <button id="startButton">Los geht's!</button>
 
     <div id="quizArea" class="hide">
         <p>Hör genau hin!</p>
@@ -50,37 +62,31 @@
         let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
         let timeoutId = null;
         const overlay = document.getElementById("black-overlay");
-
-        // 100% funktionierender Proxy (Stand November 2025)
         const proxy = "https://api.allorigins.win/raw?url=";
 
         async function sucheVideo(artist) {
-            // 5 verschiedene Suchbegriffe für maximale Vielfalt
             const queries = [
                 `${artist} official music video`,
                 `${artist} offizielles video`,
-                `${artist} music video -live -reaction -lyrics`,
+                `${artist} music video -live -reaction`,
                 `${artist} topic -live`,
-                `${artist} audio`
+                `${artist} -topic`
             ];
             const query = queries[Math.floor(Math.random() * queries.length)];
 
-            // Zufällige Seite 1–10 simulieren durch zusätzliche Suchwörter + Sortierung
-            const page = Math.floor(Math.random() * 10);
-            const finalQuery = page === 0 ? query : `${query} ${page} ${["album", "track", "song", "full", "hd"][Math.floor(Math.random()*5)]}`;
+            // Zufällige Variation für Vielfalt (z.B. "album", "track", "full")
+            const variation = ["", " album", " track", " full", " hd"][Math.floor(Math.random() * 5)];
+            const finalQuery = query + variation;
 
             const url = proxy + encodeURIComponent("https://www.youtube.com/results?search_query=" + encodeURIComponent(finalQuery));
             const resp = await fetch(url);
             const html = await resp.text();
 
-            // Alle Video-IDs holen
             const ids = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m => m[1]);
-            if (ids.length < 3) throw "Keine Videos";
+            if (ids.length < 5) throw "Keine Videos";
 
-            // Zufällig aus den ersten 80–100 nehmen → echte Vielfalt
-            videoId = ids[Math.floor(Math.random() * Math.min(80, ids.length))];
+            videoId = ids[Math.floor(Math.random() * Math.min(150, ids.length))];  // aus bis zu 150 Ergebnissen
 
-            // Besserer Titel-Parser
             const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
             let raw = titleMatch ? titleMatch[1] : "Song";
 
@@ -90,9 +96,7 @@
                 .replace(/\s*[-|–—:]\s*.*/g, '')
                 .trim();
 
-            if (currentTitle.length < 3 || currentTitle.toLowerCase().includes("topic")) {
-                currentTitle = "Unbekannter Song";
-            }
+            if (currentTitle.length < 3) currentTitle = "Unbekannter Song";
         }
 
         function playSnippet(showVideo = false) {
@@ -102,7 +106,7 @@
             player.loadVideoById({
                 videoId: videoId,
                 startSeconds: startSec,
-                playerVars: { controls:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, autoplay:1 }
+                playerVars: { controls:0, showinfo:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, autoplay:1 }
             });
             player.playVideo();
 
@@ -132,7 +136,7 @@
             if (!currentArtist) return alert("Künstler eingeben!");
             snippetLen = parseInt(document.getElementById("difficulty").value);
             document.getElementById("quizArea").classList.remove("hide");
-            player = new YT.Player('player', { events: { onReady: neueRunde }});
+            neueRunde();
         };
 
         document.getElementById("guessButton").onclick = () => {
