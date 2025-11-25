@@ -7,20 +7,20 @@
     <style>
         body { font-family: Arial; text-align: center; background: #f0f8ff; padding: 20px; }
         h1 { color: #ff69b4; }
-        input, button, select { padding: 12px; font-size: 18px; margin: 10px; border-radius: 10px; }
+        input, button, select { padding: 12px; font-size: 18px; margin: 8px; border-radius: 10px; }
         button { background: #ff69b4; color: white; border: none; cursor: pointer; }
         button:hover { background: #ff1493; }
         #player-container { position: relative; width: 90%; max-width: 600px; height: 350px; margin: 20px auto; border: 5px solid #ff69b4; border-radius: 15px; overflow: hidden; background:#000; }
-        #player { position: absolute; top: -100px; left: -100px; width: 100px; height: 100px; } /* komplett aus dem Bildschirm schieben */
-        #feedback { font-size: 24px; margin: 20px; }
+        #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         .hide { display: none; }
+        #feedback { font-size: 24px; margin: 20px; min-height: 60px; }
     </style>
 </head>
 <body>
     <h1>Welcher Song ist das?</h1>
     <p>Schreib einen Künstler rein und rate!</p>
 
-    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC, Eminem...">
+    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC...">
     <select id="snippetLength">
         <option value="5">5 Sekunden (hart)</option>
         <option value="10" selected>10 Sekunden (normal)</option>
@@ -30,31 +30,44 @@
 
     <div id="quizArea" class="hide">
         <p>Hör genau hin!</p>
-        <div id="player-container">
-            <div id="player"></div>
-        </div>
+        <div id="player-container"><div id="player"></div></div>
         <br>
         <input type="text" id="guessInput" placeholder="Songtitel eingeben">
         <button id="guessButton">Raten!</button>
-        <button id="nextButton">Nächster Song</button>
+        <br>
+        <button id="repeatAudio" class="hide">Nochmal hören (nur Ton)</button>
+        <button id="repeatVideo" class="hide">Mit Video hören</button>
+        <button id="giveUp" class="hide">Aufgeben & alles zeigen</button>
+        <button id="nextButton" class="hide">Nächster Song</button>
         <p id="feedback"></p>
     </div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         const apiKey = 'AIzaSyDkjYLjKgN2DX47AefC1GYsIXdMMWTlyqk';
-        let player;
-        let currentTitle = "";
+        let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10;
 
         async function sucheVideo(kuenstler) {
             const query = `${kuenstler} official audio OR official music video`;
             const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=30&key=${apiKey}`);
             const data = await res.json();
             const videos = data.items.filter(v => v.id?.videoId);
-            if (!videos.length) throw "Nix gefunden";
+            if (!videos.length) throw "Nix";
             const random = videos[Math.floor(Math.random() * videos.length)];
             currentTitle = random.snippet.title.replace(/\(official.*\)/gi, "").replace(/official music video/gi, "").replace(/lyrics/gi, "").trim();
-            return random.id.videoId;
+            videoId = random.id.videoId;
+            return videoId;
+        }
+
+        function playSnippet(withVideo = false) {
+            player.loadVideoById({
+                videoId: videoId,
+                startSeconds: startSec,
+                suggestedQuality: 'small'
+            });
+            player.playVideo();
+            setTimeout(() => player.pauseVideo(), snippetLen * 1000);
+            if (!withVideo) player.getIframe().style.opacity = '0';
         }
 
         document.getElementById("startButton").onclick = async () => {
@@ -62,46 +75,56 @@
             if (!kuenstler) return alert("Künstler eingeben!");
             document.getElementById("quizArea").classList.remove("hide");
             document.getElementById("feedback").textContent = "Suche Song...";
+            document.querySelectorAll("#repeatAudio, #repeatVideo, #giveUp, #nextButton").forEach(b => b.classList.add("hide"));
 
             try {
-                const videoId = await sucheVideo(kuenstler);
-                const laenge = parseInt(document.getElementById("snippetLength").value);
-                const start = Math.floor(Math.random() * 120);
+                await sucheVideo(kuenstler);
+                snippetLen = parseInt(document.getElementById("snippetLength").value);
+                startSec = Math.floor(Math.random() * 120);
 
                 player = new YT.Player('player', {
                     videoId: videoId,
-                    playerVars: {
-                        autoplay: 1,
-                        controls: 0,
-                        start: start,
-                        modestbranding: 1,
-                        rel: 0,
-                        fs: 0,
-                        iv_load_policy: 3,
-                        cc_load_policy: 0,
-                        disablekb: 1,
-                        origin: window.location.origin
-                    },
-                    events: {
-                        onReady: () => {
-                            player.playVideo();
-                            document.getElementById("feedback").textContent = "Hör genau hin!";
-                            setTimeout(() => player.pauseVideo(), laenge * 1000);
-                        }
-                    }
+                    playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, fs: 0, iv_load_policy: 3, origin: window.location.origin },
+                    events: { onReady: () => playSnippet(false) }
                 });
-            } catch {
-                document.getElementById("feedback").textContent = "Kein Song gefunden – anderer Künstler?";
-            }
+                document.getElementById("feedback").textContent = "Hör genau hin!";
+            } catch { document.getElementById("feedback").textContent = "Kein Song gefunden"; }
         };
 
         document.getElementById("guessButton").onclick = () => {
             const tipp = document.getElementById("guessInput").value.toLowerCase().trim();
-            if (tipp && currentTitle.toLowerCase().includes(tipp)) {
-                document.getElementById("feedback").innerHTML = `RICHTIG! Es war: <b>${currentTitle}</b>`;
+            if (currentTitle.toLowerCase().includes(tipp)) {
+                document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
+                document.getElementById("nextButton").classList.remove("hide");
+                document.querySelectorAll("#repeatAudio, #repeatVideo, #giveUp").forEach(b => b.classList.add("hide"));
             } else {
-                document.getElementById("feedback").innerHTML = `Falsch Es war: <b>${currentTitle}</b>`;
+                document.getElementById("feedback").textContent = "Leider falsch… nochmal versuchen?";
+                document.getElementById("repeatAudio").classList.remove("hide");
+                document.getElementById("repeatVideo").classList.remove("hide");
+                document.getElementById("giveUp").classList.remove("hide");
+                document.getElementById("guessInput").value = "";
             }
+        };
+
+        document.getElementById("repeatAudio").onclick = () => {
+            player.getIframe().style.opacity = '0';
+            playSnippet(false);
+            document.getElementById("feedback").textContent = "Nochmal nur Ton…";
+        };
+
+        document.getElementById("repeatVideo").onclick = () => {
+            player.getIframe().style.opacity = '1';
+            playSnippet(true);
+            document.getElementById("feedback").textContent = "Mit Video…";
+        };
+
+        document.getElementById("giveUp").onclick = () => {
+            player.getIframe().style.opacity = '1';
+            player.loadVideoById(videoId); // komplettes Video
+            player.playVideo();
+            document.getElementById("feedback").innerHTML = `Aufgegeben! Es war:<br><b>${currentTitle}</b>`;
+            document.getElementById("nextButton").classList.remove("hide");
+            document.querySelectorAll("#repeatAudio, #repeatVideo, #giveUp").forEach(b => b.classList.add("hide"));
         };
 
         document.getElementById("nextButton").onclick = () => location.reload();
