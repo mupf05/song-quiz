@@ -12,8 +12,8 @@
         button:hover{background:#ff1493;}
         #player-container{position:relative;width:90%;max-width:600px;height:350px;margin:20px auto;border:5px solid #ff69b4;border-radius:15px;overflow:hidden;background:#000;}
         #player{width:100%;height:100%;border:none;}
-        #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:20;}
-        #blocker{position:absolute;top:0;left:0;width:100%;height:100%;background:transparent;z-index:999;}
+        #black-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:99;}
+        #blocker{position:absolute;top:-50px;left:0;width:100%;height:calc(100% + 100px);background:transparent;z-index:9999;cursor:pointer;}
         .hide{display:none;}
         #feedback{font-size:24px;margin:20px;min-height:60px;}
     </style>
@@ -55,14 +55,9 @@
         const proxy = "https://corsproxy.io/?";
 
         async function sucheVideo(artist) {
-            // DIE MAGISCHE SUCHFORMEL – funktioniert bei allen Deutschrap-Künstlern 100%
             const queries = [
-                `${artist} official music video`,
-                `${artist} offizielles video`,
-                `${artist} music video`,
-                `${artist} vevo`,
-                `${artist} topic`,
-                `${artist} -topic`
+                `${artist} official music video`, `${artist} offizielles video`,
+                `${artist} music video`, `${artist} vevo`, `${artist} topic`
             ];
 
             for (let q of queries) {
@@ -71,21 +66,15 @@
                     const resp = await fetch(url);
                     const html = await resp.text();
 
-                    // Nur echte Videos mit "music video" oder "official" im Titel
                     const candidates = [...html.matchAll(/watch\?v=([a-zA-Z0-9_-]{11})/g)]
-                        .map(m => m[1])
-                        .slice(0, 20);
+                        .map(m => m[1]).slice(0, 20);
+                    if (!candidates.length) continue;
 
-                    if (candidates.length === 0) continue;
-
-                    // Zufälliges Video aus den ersten 20
                     videoId = candidates[Math.floor(Math.random() * candidates.length)];
 
-                    // Titel holen
                     const titleMatch = html.match(new RegExp(`"videoId":"${videoId}".*?"text":"([^"]+)"`));
                     let raw = titleMatch ? titleMatch[1] : artist + " Song";
 
-                    // Super-sauberer Titel
                     currentTitle = raw
                         .split(/[-|–—:]/).pop()
                         .replace(/\s*\(.*?\)\s*/g, "")
@@ -93,7 +82,7 @@
                         .replace(/official.{0,30}video|music video|lyrics|audio|hd|4k|vevo|topic|feat.*|ft.*/gi, "")
                         .trim();
 
-                    if (currentTitle.length > 3) return; // Erfolg!
+                    if (currentTitle.length > 3) return;
                 } catch(e) {}
             }
             throw "Kein Video";
@@ -106,7 +95,19 @@
             player.loadVideoById({
                 videoId: videoId,
                 startSeconds: startSec,
-                playerVars: { controls:0, modestbranding:1, fs:0, rel:0, iv_load_policy:3, disablekb:1, autoplay:1 }
+                playerVars: {
+                    controls: 0,
+                    showinfo: 0,
+                    modestbranding: 1,
+                    fs: 0,
+                    rel: 0,
+                    iv_load_policy: 3,
+                    disablekb: 1,
+                    autoplay: 1,
+                    playsinline: 1,
+                    cc_load_policy: 0,
+                    widget_referrer: window.location.href
+                }
             });
             player.playVideo();
 
@@ -127,7 +128,7 @@
                 playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
-                document.getElementById("feedback").textContent = "Momentan kein Video – nochmal „Los geht’s!“ drücken oder anderen Künstler probieren";
+                document.getElementById("feedback").textContent = "Kein Video – nochmal „Los geht’s!“ oder anderen Künstler probieren";
             }
         }
 
@@ -142,7 +143,8 @@
         document.getElementById("guessButton").onclick = () => {
             const guess = document.getElementById("guessInput").value.toLowerCase().trim();
             if (currentTitle.toLowerCase().includes(guess)) {
-                overlay.style.display = 'none'; blocker.style.display = 'none';
+                overlay.style.display = 'none';
+                blocker.style.display = 'none';
                 player.playVideo();
                 document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
                 document.getElementById("nextButton").classList.remove("hide");
@@ -159,7 +161,8 @@
         document.getElementById("repeatAudio").onclick = () => playSnippet(false);
         document.getElementById("repeatVideo").onclick = () => playSnippet(true);
         document.getElementById("giveUp").onclick = () => {
-            overlay.style.display = 'none'; blocker.style.display = 'none';
+            overlay.style.display = 'none';
+            blocker.style.display = 'none';
             player.loadVideoById({ videoId: videoId, startSeconds: startSec });
             player.playVideo();
             document.getElementById("feedback").innerHTML = `Aufgegeben! Es war:<br><b>${currentTitle}</b>`;
