@@ -2,35 +2,26 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcher Song ist das?</title>
     <style>
-        body { font-family: Arial; text-align: center; background: #f0f8ff; padding: 20px; }
-        h1 { color: #ff69b4; }
-        input, button, select { padding: 12px; font-size: 18px; margin: 8px; border-radius: 10px; }
-        button { background: #ff69b4; color: white; border: none; cursor: pointer; }
-        button:hover { background: #ff1493; }
-        #player-container {
-            position: relative; width: 90%; max-width: 600px;
-            height: 350px; margin: 20px auto;
-            border: 5px solid #ff69b4; border-radius: 15px;
-            overflow: hidden; background:#000;
-        }
-        #player { width:100%; height:100%; border:none; }
-        #black-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: black; z-index: 10; pointer-events: none;
-        }
-        .hide { display:none; }
-        #feedback { font-size:24px; margin:20px; min-height:60px; }
+        body{font-family:Arial;text-align:center;background:#f0f8ff;padding:20px;}
+        h1{color:#ff69b4;}
+        input,button,select{padding:12px;font-size:18px;margin:8px;border-radius:10px;}
+        button{background:#ff69b4;color:white;border:none;cursor:pointer;}
+        button:hover{background:#ff1493;}
+        #player-container{position:relative;width:90%;max-width:600px;height:350px;margin:20px auto;border:5px solid #ff69b4;border-radius:15px;overflow:hidden;background:#000;}
+        #player{width:100%;height:100%;border:none;}
+        #overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:black;z-index:10;pointer-events:none;}
+        .hide{display:none;}
+        #feedback{font-size:24px;margin:20px;min-height:60px;}
     </style>
 </head>
 <body>
     <h1>Welcher Song ist das?</h1>
     <p>Schreib einen Künstler rein und rate!</p>
-
-    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC...">
-    <select id="snippetLength">
+    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Taylor Swift, Bad Bunny...">
+    <select id="difficulty">
         <option value="5">5 Sekunden (hart)</option>
         <option value="10" selected>10 Sekunden (normal)</option>
         <option value="20">20 Sekunden (easy)</option>
@@ -41,10 +32,10 @@
         <p>Hör genau hin!</p>
         <div id="player-container">
             <div id="player"></div>
-            <div id="black-overlay"></div>
+            <div id="overlay"></div>
         </div>
         <br>
-        <input type="text" id="guessInput" placeholder="Songtitel eingeben">
+        <input type="text" id="guessInput" placeholder="Songtitel eingeben" autocomplete="off">
         <button id="guessButton">Raten!</button>
         <br>
         <button id="repeatAudio" class="hide">Nochmal hören (nur Ton)</button>
@@ -56,21 +47,31 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        const apiKey = 'AIzaSyDkjYLjKgN2DX47AefC1GYsIXdMMWTlyqk';
-        let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10;
-        let currentArtist = "";
-        const overlay = document.getElementById("black-overlay");
+        let player, currentTitle = "", videoId = "", startSec = 0, snippetLen = 10, currentArtist = "";
+        const overlay = document.getElementById("overlay");
 
-        async function sucheVideo(kuenstler) {
-            const query = `${kuenstler} official audio OR official music video`;
-            const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=30&key=${apiKey}`);
-            const data = await res.json();
-            const videos = data.items.filter(v => v.id?.videoId);
-            if (!videos.length) throw "Nix";
-            const random = videos[Math.floor(Math.random() * videos.length)];
-            currentTitle = random.snippet.title.replace(/\(official.*\)/gi, "").replace(/official music video/gi, "").replace(/lyrics/gi, "").trim();
-            videoId = random.id.videoId;
-            return videoId;
+        // Öffentlicher Proxy (funktioniert weltweit, kein Key nötig)
+        const proxy = "https://api.allorigins.ml/get?url=";
+
+        async function sucheVideo(artist) {
+            const query = encodeURIComponent(`${artist} official music video OR topic -live -remix`);
+            const url = `${proxy}${encodeURIComponent(`https://www.youtube.com/results?search_query=${query}`)}`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+            const html = data.contents;
+
+            // Extrahiert Video-IDs aus der YouTube-Suchseite
+            const regex = /"videoId":"([^"]{11})"/g;
+            const ids = [...html.matchAll(regex)].map(m => m[1]);
+            if (!ids.length) throw "Kein Video";
+
+            // Filtert nur echte Musikvideos
+            const randomId = ids[Math.floor(Math.random() * Math.min(15, ids.length))];
+            videoId = randomId;
+
+            // Titel holen (aus Thumbnail oder Fallback)
+            const titleMatch = html.match(new RegExp(`"videoId":"${randomId}".*?"title":{"runs":\\[\\{"text":"([^"]+)`));
+            currentTitle = titleMatch ? titleMatch[1].replace(/\(Official.+|Lyrics|Video|Audio/gi, "").trim() : "Unbekannter Titel";
         }
 
         function playSnippet(showVideo = false) {
@@ -80,7 +81,7 @@
             setTimeout(() => player.pauseVideo(), snippetLen * 1000);
         }
 
-        async function starteNeueRunde() {
+        async function neueRunde() {
             document.getElementById("feedback").textContent = "Suche Song...";
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp,#nextButton").forEach(b => b.classList.add("hide"));
             document.getElementById("guessInput").value = "";
@@ -88,27 +89,24 @@
             try {
                 await sucheVideo(currentArtist);
                 startSec = Math.floor(Math.random() * 120);
-                player.loadVideoById({ videoId: videoId, startSeconds: startSec });
-                player.playVideo();
-                overlay.style.display = 'block';
-                setTimeout(() => player.pauseVideo(), snippetLen * 1000);
+                playSnippet(false);
                 document.getElementById("feedback").textContent = "Hör genau hin!";
             } catch {
-                document.getElementById("feedback").textContent = "Kein Song gefunden – probier einen anderen Künstler";
+                document.getElementById("feedback").textContent = "Kein passendes Video gefunden – probier einen anderen Künstler";
             }
         }
 
         document.getElementById("startButton").onclick = async () => {
             currentArtist = document.getElementById("artistInput").value.trim();
             if (!currentArtist) return alert("Künstler eingeben!");
-            snippetLen = parseInt(document.getElementById("snippetLength").value);
+            snippetLen = parseInt(document.getElementById("difficulty").value);
             document.getElementById("quizArea").classList.remove("hide");
-            await starteNeueRunde();
+            player = new YT.Player('player', { events: { onReady: neueRunde }});
         };
 
         document.getElementById("guessButton").onclick = () => {
-            const tipp = document.getElementById("guessInput").value.toLowerCase().trim();
-            if (currentTitle.toLowerCase().includes(tipp)) {
+            const guess = document.getElementById("guessInput").value.toLowerCase().trim();
+            if (currentTitle.toLowerCase().includes(guess)) {
                 overlay.style.display = 'none';
                 player.playVideo();
                 document.getElementById("feedback").innerHTML = `RICHTIG! Es war:<br><b>${currentTitle}</b>`;
@@ -116,16 +114,13 @@
                 document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
             } else {
                 document.getElementById("feedback").textContent = "Leider falsch – nochmal versuchen?";
-                document.getElementById("repeatAudio").classList.remove("hide");
-                document.getElementById("repeatVideo").classList.remove("hide");
-                document.getElementById("giveUp").classList.remove("hide");
+                document.getElementById("repeatAudio,#repeatVideo,#giveUp").forEach(b => document.getElementById(b.slice(1)).classList.remove("hide"));
                 document.getElementById("guessInput").value = "";
             }
         };
 
         document.getElementById("repeatAudio").onclick = () => playSnippet(false);
         document.getElementById("repeatVideo").onclick = () => playSnippet(true);
-
         document.getElementById("giveUp").onclick = () => {
             overlay.style.display = 'none';
             player.loadVideoById({ videoId: videoId, startSeconds: startSec });
@@ -134,8 +129,7 @@
             document.getElementById("nextButton").classList.remove("hide");
             document.querySelectorAll("#repeatAudio,#repeatVideo,#giveUp").forEach(b => b.classList.add("hide"));
         };
-
-        document.getElementById("nextButton").onclick = () => starteNeueRunde();
+        document.getElementById("nextButton").onclick = neueRunde;
     </script>
 </body>
 </html>
