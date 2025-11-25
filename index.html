@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>Song-Quiz</title>
+    <style>
+        body { font-family: Arial; text-align: center; background: #f0f8ff; padding: 20px; }
+        h1 { color: #ff69b4; }
+        input, button, select { padding: 12px; font-size: 18px; margin: 10px; border-radius: 10px; }
+        button { background: #ff69b4; color: white; border: none; cursor: pointer; }
+        button:hover { background: #ff1493; }
+        #player { width: 90%; max-width: 600px; height: 350px; margin: 20px auto; border: 5px solid #ff69b4; border-radius: 15px; background:#000; }
+        #feedback { font-size: 24px; margin: 20px; }
+        .hide { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Welcher Song ist das?</h1>
+    <p>Schreib einen Künstler rein und rate!</p>
+
+    <input type="text" id="artistInput" placeholder="z.B. Gzuz, Bonez MC, Eminem...">
+    <br>
+    <select id="snippetLength">
+        <option value="5">5 Sekunden (hart)</option>
+        <option value="10" selected>10 Sekunden (normal)</option>
+        <option value="20">20 Sekunden (easy)</option>
+    </select>
+    <br>
+    <button id="startButton">Los geht’s!</button>
+
+    <div id="quizArea" class="hide">
+        <p>Hör genau hin!</p>
+        <div id="player"></div>
+        <br>
+        <input type="text" id="guessInput" placeholder="Songtitel eingeben">
+        <button id="guessButton">Raten!</button>
+        <button id="nextButton">Nächster Song</button>
+        <p id="feedback"></p>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        const apiKey = 'AIzaSyDkjYLjKgN2DX47AefC1GYsIXdMMWTlyqk';
+        let player;
+        let currentTitle = "";
+
+        async function sucheVideo(kuenstler) {
+            const query = `${kuenstler} official audio OR official music video`;
+            const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=30&key=${apiKey}`);
+            const data = await res.json();
+            const videos = data.items.filter(v => v.id?.videoId);
+            if (!videos.length) throw "Nix gefunden";
+            const random = videos[Math.floor(Math.random() * videos.length)];
+            currentTitle = random.snippet.title.replace(/\(official.*\)/gi, "").replace(/official music video/gi, "").replace(/lyrics/gi, "").trim();
+            return random.id.videoId;
+        }
+
+        document.getElementById("startButton").onclick = async () => {
+            const kuenstler = document.getElementById("artistInput").value.trim();
+            if (!kuenstler) return alert("Künstler eingeben!");
+            document.getElementById("quizArea").classList.remove("hide");
+            document.getElementById("feedback").textContent = "Suche Song...";
+
+            try {
+                const videoId = await sucheVideo(kuenstler);
+                const laenge = parseInt(document.getElementById("snippetLength").value);
+                const start = Math.floor(Math.random() * 120);
+
+                player = new YT.Player('player', {
+                    height: '350', width: '600',
+                    videoId: videoId,
+                    host: 'https://www.youtube-nocookie.com',
+                    playerVars: { autoplay: 1, controls: 0, start: start, modestbranding: 1, rel: 0, origin: window.location.origin },
+                    events: {
+                        onReady: () => { player.playVideo(); document.getElementById("feedback").textContent = "Hör genau hin!"; setTimeout(() => player.pauseVideo(), laenge * 1000); },
+                        onError: () => { document.getElementById("player").innerHTML = `<p>Fehler – <a href="https://www.youtube.com/watch?v=${videoId}&t=${start}s" target="_blank">auf YouTube hören</a></p>`; }
+                    }
+                });
+            } catch { document.getElementById("feedback").textContent = "Kein Song gefunden – anderer Künstler?"; }
+        };
+
+        document.getElementById("guessButton").onclick = () => {
+            const tipp = document.getElementById("guessInput").value.toLowerCase().trim();
+            if (tipp && currentTitle.toLowerCase().includes(tipp)) {
+                document.getElementById("feedback").innerHTML = `RICHTIG! Es war: <b>${currentTitle}</b>`;
+            } else {
+                document.getElementById("feedback").innerHTML = `Falsch Es war: <b>${currentTitle}</b>`;
+            }
+        };
+
+        document.getElementById("nextButton").onclick = () => location.reload();
+    </script>
+</body>
+</html>
